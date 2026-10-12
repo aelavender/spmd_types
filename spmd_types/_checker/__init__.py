@@ -2483,6 +2483,7 @@ _PASSTHROUGH = {
     torch.Tensor.retain_grad,
     # Metadata queries (return non-tensor values)
     torch.Tensor.__len__,
+    torch.Tensor._is_view,
     torch.Tensor.dim,
     torch.Tensor.dim_order,
     torch.Tensor.element_size,

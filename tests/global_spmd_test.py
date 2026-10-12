@@ -836,8 +836,9 @@ class TestGlobalSpmdMetadataQueries(GlobalSpmdTestCase):
     Mirrors a tensor-parallel transformer block: the row-parallel output
     projection produces a ``{dp: V, tp: P}`` activation before its TP
     reduction. Activation checkpointing libraries (e.g. torch_remat) record
-    the layout of such a tensor with ``stride()`` and ``storage_offset()``
-    when they save it, which must not be rejected as non-linear ops.
+    the layout of such a tensor with ``stride()``, ``storage_offset()`` and
+    ``_is_view()`` when they save it, which must not be rejected as non-linear
+    ops.
     """
 
     def _row_parallel_output(self):
@@ -856,6 +857,7 @@ class TestGlobalSpmdMetadataQueries(GlobalSpmdTestCase):
             "stride": lambda t: t.stride(),
             "stride(dim)": lambda t: t.stride(0),
             "storage_offset": lambda t: t.storage_offset(),
+            "_is_view": lambda t: t._is_view(),
             "ndimension": lambda t: t.ndimension(),
             "dim_order": lambda t: t.dim_order(),
             "is_pinned": lambda t: t.is_pinned(),
