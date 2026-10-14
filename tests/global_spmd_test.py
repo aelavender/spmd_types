@@ -269,6 +269,7 @@ Collective axis default_pg spans mesh axes with mixed typechecking policies: loc
     dst: I,
     op_dtype: None,
     out_dtype: None,
+    async_op: False,
     backward_options: None,
   ) under mesh {mesh_dp, mesh_tp}""",
             )

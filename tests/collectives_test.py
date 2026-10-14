@@ -14,9 +14,21 @@ import unittest
 
 import torch
 import torch.distributed as dist
-from spmd_types import all_gather, all_reduce, all_to_all, I, P, R, reduce_scatter, S, V
+import torch.distributed._functional_collectives as funcol
+from spmd_types import (
+    all_gather,
+    all_reduce,
+    all_to_all,
+    I,
+    P,
+    R,
+    redistribute,
+    reduce_scatter,
+    S,
+    V,
+)
 from spmd_types._checker import assert_type, typecheck
-from spmd_types._test_utils import LocalTensorTestCase
+from spmd_types._test_utils import FakeProcessGroupTestCase, LocalTensorTestCase
 from spmd_types._type_attr import get_axis_local_type
 from spmd_types.types import MeshAxis, SpmdTypeError
 from torch.distributed.device_mesh import init_device_mesh
@@ -1210,6 +1222,89 @@ class TestFlattenedAxisCollectives(LocalTensorTestCase):
         with typecheck(strict_mode="strict"):
             with self.assertRaises(SpmdTypeError):
                 all_reduce(x, dp_cp, src=P, dst=R)
+
+
+class TestAsyncOp(FakeProcessGroupTestCase):
+    """``async_op`` / ``backward_options["async_op"]`` defer collective waits.
+
+    Under a plain fake process group (no LocalTensorMode) functional
+    collectives return ``AsyncCollectiveTensor``. By default spmd_types waits
+    on it immediately; with ``async_op=True`` the forward result is returned
+    unwaited, and ``backward_options={"async_op": True}`` does the same for the
+    backward collective, except for gradients of leaf inputs.
+    """
+
+    def test_default_waits(self):
+        x = torch.randn(2, 3)
+        self.assertNotIsInstance(
+            all_gather(x, self.pg, src=S(0), dst=R), funcol.AsyncCollectiveTensor
+        )
+        self.assertNotIsInstance(
+            all_reduce(x, self.pg, src=P, dst=R), funcol.AsyncCollectiveTensor
+        )
+        y = torch.randn(2 * self.WORLD_SIZE, 3)
+        self.assertNotIsInstance(
+            reduce_scatter(y, self.pg, src=P, dst=S(0)), funcol.AsyncCollectiveTensor
+        )
+
+    def test_all_gather_async_op(self):
+        x = torch.randn(2, 3)
+        out = all_gather(x, self.pg, src=S(0), dst=R, async_op=True)
+        self.assertIsInstance(out, funcol.AsyncCollectiveTensor)
+        self.assertEqual(tuple(out.shape), (2 * self.WORLD_SIZE, 3))
+        out.wait()
+
+    def test_reduce_scatter_async_op(self):
+        x = torch.randn(2 * self.WORLD_SIZE, 3)
+        out = reduce_scatter(x, self.pg, src=P, dst=S(0), async_op=True)
+        self.assertIsInstance(out, funcol.AsyncCollectiveTensor)
+        self.assertEqual(tuple(out.shape), (2, 3))
+        out.wait()
+
+    def test_all_reduce_async_op(self):
+        x = torch.randn(2, 3)
+        out = all_reduce(x, self.pg, src=P, dst=R, async_op=True)
+        self.assertIsInstance(out, funcol.AsyncCollectiveTensor)
+        self.assertEqual(tuple(out.shape), (2, 3))
+        out.wait()
+
+    def test_redistribute_passes_async_op(self):
+        x = torch.randn(2, 3)
+        out = redistribute(x, self.pg, src=S(0), dst=R, async_op=True)
+        self.assertIsInstance(out, funcol.AsyncCollectiveTensor)
+        out.wait()
+
+    def test_forward_async_op_does_not_defer_backward(self):
+        x = torch.randn(2, 3, requires_grad=True)
+        y = x * 2
+        grads = []
+        y.register_hook(grads.append)
+        out = all_gather(y, self.pg, src=S(0), dst=R, async_op=True)
+        out.sum().backward()
+        self.assertNotIsInstance(grads[0], funcol.AsyncCollectiveTensor)
+
+    def test_backward_async_op(self):
+        x = torch.randn(2, 3, requires_grad=True)
+        y = x * 2
+        grads = []
+        y.register_hook(grads.append)
+        out = all_gather(
+            y, self.pg, src=S(0), dst=R, backward_options={"async_op": True}
+        )
+        out.sum().backward()
+        self.assertIsInstance(grads[0], funcol.AsyncCollectiveTensor)
+        # The next backward op consumes the gradient, which waits on it.
+        self.assertNotIsInstance(x.grad, funcol.AsyncCollectiveTensor)
+        self.assertEqual(tuple(x.grad.shape), (2, 3))
+
+    def test_backward_async_op_ignored_for_leaf(self):
+        x = torch.randn(2, 3, requires_grad=True)
+        out = all_gather(
+            x, self.pg, src=S(0), dst=R, backward_options={"async_op": True}
+        )
+        out.sum().backward()
+        self.assertNotIsInstance(x.grad, funcol.AsyncCollectiveTensor)
+        self.assertEqual(tuple(x.grad.shape), (2, 3))
 
 
 if __name__ == "__main__":
