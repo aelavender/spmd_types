@@ -825,10 +825,12 @@ class TestGlobalSpmdPartialPromotion(GlobalSpmdTestCase):
 
     # TODO(zpcore): Check if this is the right behavior.
     def test_sum_sharded_dim(self):
-        """sum(x@S(0)) -> P: reducing over a sharded dim."""
+        """sum(x@S(0)) -> P; vector_norm(x@S(0)) raises (not a sum-Partial)."""
         x = self._make_input((6, 4), self.tp, S(0))
         result = torch.sum(x)
         self.assertIs(get_axis_local_type(result, self.tp), P)
+        with self.assertRaisesRegex(DTensorPropagationError, "p-norm"):
+            torch.linalg.vector_norm(x)
 
 
 class TestGlobalSpmdMetadataQueries(GlobalSpmdTestCase):

@@ -1885,6 +1885,12 @@ def dtensor_placement_to_spmd_type(
     if isinstance(placement, dtensor_type.Replicate):
         return R
     if isinstance(placement, dtensor_type.Partial):
+        if type(placement) is not dtensor_type.Partial:
+            raise DTensorPropagationError(
+                f"Only sum-Partial is supported, got {placement!r}; for a p-norm "
+                f"over a sharded dim, all_reduce torch.sum(x.abs() ** p) and take "
+                f"the p-th root"
+            )
         if placement.reduce_op != "sum":
             raise ValueError(
                 f"Only sum-Partial is supported, got reduce_op={placement.reduce_op!r}"
