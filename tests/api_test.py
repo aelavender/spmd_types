@@ -30,6 +30,10 @@ from spmd_types import (
 from spmd_types._checker import assert_type, typecheck
 from spmd_types._test_utils import LocalTensorTestCase
 from spmd_types._type_attr import get_axis_local_type
+from torch.testing._internal.common_utils import (
+    instantiate_parametrized_tests,
+    parametrize,
+)
 
 
 class TestRedistribute(LocalTensorTestCase):
@@ -407,34 +411,16 @@ class TestBackwardCorrectness(LocalTensorTestCase):
 
     # --- all_gather ---
 
-    def test_backward_all_gather_v_to_r(self):
-        x = self._generate_inputs((4,), self.pg, V)
+    @parametrize("dst", [R, I], name_fn=lambda t: t.name.lower())
+    @parametrize("gather_dim", [0, 1, 2])
+    def test_backward_all_gather_v_to(self, dst, gather_dim):
+        x = self._generate_inputs((self.WORLD_SIZE, 2), self.pg, V)
         self.spmd_gradcheck(
-            lambda x: all_gather(x, self.pg, src=V, dst=R),
+            lambda x: all_gather(x, self.pg, src=V, dst=dst, gather_dim=gather_dim),
             x,
             axis=self.pg,
             src_type=V,
-            dst_type=R,
-        )
-
-    def test_backward_all_gather_v_to_r_gather_dim_1(self):
-        x = self._generate_inputs((2, 3), self.pg, V)
-        self.spmd_gradcheck(
-            lambda x: all_gather(x, self.pg, src=V, dst=R, gather_dim=1),
-            x,
-            axis=self.pg,
-            src_type=V,
-            dst_type=R,
-        )
-
-    def test_backward_all_gather_v_to_r_gather_dim_2(self):
-        x = self._generate_inputs((2, 3), self.pg, V)
-        self.spmd_gradcheck(
-            lambda x: all_gather(x, self.pg, src=V, dst=R, gather_dim=2),
-            x,
-            axis=self.pg,
-            src_type=V,
-            dst_type=R,
+            dst_type=dst,
         )
 
     def test_backward_all_gather_s0_to_r(self):
@@ -445,16 +431,6 @@ class TestBackwardCorrectness(LocalTensorTestCase):
             axis=self.pg,
             src_type=S(0),
             dst_type=R,
-        )
-
-    def test_backward_all_gather_v_to_i(self):
-        x = self._generate_inputs((4,), self.pg, V)
-        self.spmd_gradcheck(
-            lambda x: all_gather(x, self.pg, src=V, dst=I),
-            x,
-            axis=self.pg,
-            src_type=V,
-            dst_type=I,
         )
 
     def test_backward_all_gather_s0_to_i(self):
@@ -520,6 +496,9 @@ class TestBackwardCorrectness(LocalTensorTestCase):
             src_type=S(0),
             dst_type=S(1),
         )
+
+
+instantiate_parametrized_tests(TestBackwardCorrectness)
 
 
 if __name__ == "__main__":

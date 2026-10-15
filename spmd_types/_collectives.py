@@ -307,7 +307,7 @@ class _AllGatherStack(torch.autograd.Function):
             )
         else:
             grad = convert(
-                grad_out,
+                grad_out.movedim(ctx.gather_dim, 0),
                 ctx.axis,
                 src=I,
                 dst=V,
