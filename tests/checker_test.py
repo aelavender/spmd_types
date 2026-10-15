@@ -13,6 +13,7 @@ Covers: _checker.py
 import logging
 import re
 import unittest
+from functools import partial
 
 import expecttest
 import torch
@@ -48,7 +49,7 @@ from spmd_types._checker import (
     trace,
     typecheck,
 )
-from spmd_types._collectives import all_reduce
+from spmd_types._collectives import all_gather, all_reduce, all_to_all
 from spmd_types._mesh import _pg_for_axis
 from spmd_types._mesh_axis import MeshAxis
 from spmd_types._scalar_sentinel import _Scalar
@@ -569,11 +570,15 @@ class TestFactoryTensorsPermissive(LocalTensorTestCase):
 
     def test_factory_spmd_collective_permissive_propagates(self):
         """Permissive mode propagates {} tensor through SPMD collectives."""
-        with typecheck(strict_mode="permissive"):
-            z = torch.zeros(4)
-            # {} tensor has no type for the collective's axis.
-            # Permissive mode skips validation but still propagates dst type.
-            all_reduce(z, self.pg, dst=R)
+        for is_local in (True, False):
+            with (
+                self.subTest(local=is_local),
+                typecheck(strict_mode="permissive", local=is_local),
+            ):
+                z = torch.zeros(4)
+                # {} tensor has no type for the collective's axis.
+                # Permissive mode skips validation but still propagates dst type.
+                all_reduce(z, self.pg, dst=R)
 
 
 class TestAssertTypeRefinement(LocalTensorTestCase):
@@ -3583,6 +3588,7 @@ class TestSingletonAxisStrictMode(expecttest.TestCase):
         cls._pg_ctx = fake_pg(cls.WORLD_SIZE)
         cls._pg_ctx.__enter__()
         mesh = init_device_mesh("cpu", (1, 6), mesh_dim_names=("singleton", "real"))
+        cls.mesh = mesh
         cls.singleton = mesh.get_group("singleton")
         cls.real = mesh.get_group("real")
         cls._tc_ctx = typecheck()
@@ -3607,13 +3613,38 @@ class TestSingletonAxisStrictMode(expecttest.TestCase):
 
     def test_strict_mode_no_error_for_singleton(self):
         """Strict mode should not raise for missing singleton axis on collectives."""
-        x = torch.randn(4)
-        assert_type(x, {self.real: P})
-        # Calling all_reduce on singleton axis -- should not raise even in
-        # strict mode, since singleton axes are simply not tracked.
-        result = all_reduce(x, self.singleton, src=P, dst=R)
-        # Type on real axis should be preserved
-        self.assertIs(get_axis_local_type(result, self.real), P)
+        sharded = ({self.real: S(0)},)
+        for is_local, local_axes, types in (
+            (True, (), sharded),
+            (False, (), sharded),
+            (False, ("real",), sharded),
+            (False, (), ({self.real: R}, PartitionSpec(None, None))),
+        ):
+            with (
+                self.subTest(local=is_local, local_axes=local_axes, types=types),
+                typecheck(local=is_local),
+                set_current_mesh(self.mesh, local_axes=local_axes),
+            ):
+                x = torch.randn(1, 4)
+                assert_type(x, *types)
+                # Calling all_reduce on singleton axis -- should not raise even in
+                # strict mode, since singleton axes are simply not tracked.
+                result = all_reduce(x, self.singleton, src=P, dst=R)
+                # Type (and PartitionSpec in global mode) should be preserved
+                self.assertEqual(get_local_type(result), get_local_type(x))
+                if is_local:
+                    continue
+                self.assertEqual(get_partition_spec(result), get_partition_spec(x))
+                for move_dims in (
+                    partial(all_gather, src=V, dst=R),
+                    partial(all_to_all, src=V, dst=V, split_dim=0, concat_dim=1),
+                ):
+                    if any(get_partition_spec(x)) and not local_axes:
+                        with self.assertRaisesRegex(SpmdTypeError, "move tensor dims"):
+                            move_dims(x, self.singleton)
+                    else:
+                        moved = move_dims(x, self.singleton)
+                        self.assertIsNone(get_partition_spec(moved))
 
 
 class TestSingletonAxisInMeshFiltered(expecttest.TestCase):

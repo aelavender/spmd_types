@@ -2878,7 +2878,7 @@ class _SpmdTypeMode(torch.overrides.TorchFunctionMode):
                 [local_type], [input_spec]
             )
             resolved_axes = _resolve_collective_axes(axis, local_type)
-        collective_axes = resolved_axes or [axis]
+        collective_axes = resolved_axes or []
         global_collective_axes = [
             ax for ax in collective_axes if self._is_global_axis(ax)
         ]
@@ -2985,6 +2985,24 @@ class _SpmdTypeMode(torch.overrides.TorchFunctionMode):
                 result.ndim,
             )
             _set_partition_spec(result, new_output_spec)
+        elif resolved_axes is None and not self._local:
+            # all_to_all(V, V) unbinds split_dim and stacks on concat_dim.
+            moves_dims = result.ndim != x.ndim or (
+                src is V
+                and dst is V
+                and (kwargs.get("split_dim") or 0) != (kwargs.get("concat_dim") or 0)
+            )
+            if not moves_dims:
+                _set_partition_spec(result, input_spec)
+            elif input_spec is not None and self._global_axes_for(
+                input_spec.axes_with_partition_spec()
+            ):
+                raise SpmdTypeError(
+                    f"{func.__name__}: stack semantics on axis "
+                    f"{format_axis(axis)} move tensor dims, so the "
+                    f"input PartitionSpec no longer lines up with the "
+                    f"result. Use S(i) instead of V."
+                )
 
         if _TRACE:
             _trace_op(
