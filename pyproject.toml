@@ -65,5 +65,18 @@ python_files = ["*_test.py"]
 
 # BEGIN GENERATED buck-manual-deps -- do not edit by hand
 # Regenerate: export_buck_manual_deps.py
-"spmd_types/__init__.py" = ["../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_audio_artifacts.py", "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_audio_artifacts_v22.py", "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_audio_encoder_r6_i11_v22.py", "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_conditioner_calibration_v21.py", "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_ctts_pipeline_r6_i11_v22.py", "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_landscape_recipe_r5_v21.py", "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_landscape_sampling_r5.py", "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_landscape_sampling_r6_i11_v22.py", "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_landscape_sampling_r6_i11_v22_gb300.py", "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_landscape_style_r5_v21.py", "../ops/interfaces/attn/triton_attention_fp32.py", "../ops/interfaces/gemm/gemm.py"]
+"spmd_types/__init__.py" = [
+    "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_audio_artifacts.py",
+    "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_audio_artifacts_v22.py",
+    "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_audio_encoder_r6_i11_v22.py",
+    "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_conditioner_calibration_v21.py",
+    "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_ctts_pipeline_r6_i11_v22.py",
+    "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_landscape_recipe_r5_v21.py",
+    "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_landscape_sampling_r5.py",
+    "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_landscape_sampling_r6_i11_v22.py",
+    "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_landscape_sampling_r6_i11_v22_gb300.py",
+    "../../llama4x/projects/experimental/rtai_avatar/pumpkin/sythetic_data/t2av/conversation_landscape_style_r5_v21.py",
+    "../ops/interfaces/attn/triton_attention_fp32.py",
+    "../ops/interfaces/gemm/gemm.py",
+]
 # END GENERATED buck-manual-deps
